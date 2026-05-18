@@ -1,0 +1,16 @@
+# 数据目录（日报、译文、数据库）
+data/
+
+# 密钥文件
+.env
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+*.swo

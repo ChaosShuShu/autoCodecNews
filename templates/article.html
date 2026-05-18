@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="title-cn" content="{{ title_cn }}">
+<meta name="summary" content="{{ summary }}">
+<meta name="keywords" content="{{ keywords|join(',') }}">
+<title>{{ title_cn }} - autoCodecDoc</title>
+<style>
+  body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #fafafa; color: #333; line-height: 1.8; }
+  .header { border-bottom: 2px solid #e0e0e0; padding-bottom: 16px; margin-bottom: 24px; }
+  .title-cn { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+  .title-en { font-size: 14px; color: #888; margin-bottom: 8px; }
+  .meta { font-size: 13px; color: #999; }
+  .meta a { color: #0366d6; text-decoration: none; }
+  .meta a:hover { text-decoration: underline; }
+  .summary { background: #fffbe6; border-left: 4px solid #ffd700; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+  .keywords { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .keyword { background: #e8f4fd; color: #0366d6; padding: 2px 10px; border-radius: 12px; font-size: 13px; }
+  .content { font-size: 15px; }
+  .content p { margin: 0 0 12px 0; }
+  .actions { margin: 20px 0; padding: 16px; background: #f0f0f0; border-radius: 8px; text-align: center; }
+  .actions a { display: inline-block; margin: 0 8px; padding: 8px 20px; background: #0366d6; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; }
+  .actions a:hover { background: #0255b3; }
+  .actions a.secondary { background: #666; }
+  .back { margin-top: 24px; text-align: center; }
+  .back a { color: #0366d6; text-decoration: none; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="title-cn">{{ title_cn }}</div>
+  {% if title != title_cn %}
+  <div class="title-en">原文标题: {{ title }}</div>
+  {% endif %}
+  <div class="meta">
+    📡 {{ feed }} &nbsp;|&nbsp; 📅 {{ published }}
+  </div>
+</div>
+
+{% if summary %}
+<div class="summary">
+  <strong>📝 内容摘要</strong><br>
+  {{ summary }}
+</div>
+{% endif %}
+
+{% if keywords %}
+<div class="keywords">
+  {% for kw in keywords %}
+  <span class="keyword">#{{ kw }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="actions">
+  <a href="{{ url }}" target="_blank">📎 阅读原文</a>
+  {% if content %}
+  <a class="secondary" href="#local">📖 本地译文</a>
+  {% endif %}
+</div>
+
+{% if content %}
+<div class="content" id="local">
+  <h3>📖 本地存档原文</h3>
+  <pre style="white-space: pre-wrap; font-size: 14px; background: #f5f5f5; padding: 16px; border-radius: 6px;">{{ content[:8000] }}{% if content|length > 8000 %}\n\n...[原文过长，此处截断]...{% endif %}</pre>
+</div>
+{% endif %}
+
+<div class="back">
+  <a href="../daily/{{ id[:10] }}.html">← 返回今日日报</a>
+</div>
+</body>
+</html>

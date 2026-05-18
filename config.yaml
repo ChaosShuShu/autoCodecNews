@@ -1,0 +1,76 @@
+# ============================================
+# RSS 订阅 → 翻译 → 日报 配置文件
+# ============================================
+
+# RSS 订阅源列表
+feeds:
+  - name: "FFmpeg Blog"
+    url: "https://ffmpeg.org/blog.rss"
+    priority: 1
+
+  - name: "Netflix Tech Blog"
+    url: "https://netflixtechblog.com/feed"
+    priority: 1
+
+  - name: "AOM (AV1)"
+    url: "https://aomedia.org/feed/"
+    priority: 1
+
+  - name: "Streaming Learning Center"
+    url: "https://streaminglearningcenter.com/feed"
+    priority: 2
+
+  - name: "Bitmovin Blog"
+    url: "https://bitmovin.com/blog/feed/"
+    priority: 2
+
+  - name: "Twitch Engineering"
+    url: "https://blog.twitch.tv/en/engineering/feed"
+    priority: 2
+
+  - name: "Meta Engineering"
+    url: "https://engineering.fb.com/feed/"
+    priority: 2
+
+  - name: "Google AI Blog"
+    url: "https://ai.googleblog.com/feeds/posts/default"
+    priority: 2
+
+  - name: "Demuxed"
+    url: "https://demuxed.com/feed"
+    priority: 3
+
+  - name: "Red5 Pro"
+    url: "https://www.red5pro.com/blog/feed/"
+    priority: 3
+
+# 翻译引擎配置
+llm:
+  # 可选: openai / deepseek / qwen / ollama
+  provider: "openai"
+  # 模型名:
+  #   openai → gpt-4o-mini (推荐), gpt-4o
+  #   deepseek → deepseek-chat
+  #   qwen → qwen-turbo, qwen-plus
+  #   ollama → llama3, qwen2 等本地模型
+  model: "gpt-4o-mini"
+  # 可选：用 DeepSeek 更便宜
+  # provider: "deepseek"
+  # model: "deepseek-chat"
+
+# 输出配置
+output:
+  # 每日最大文章数
+  max_articles_per_day: 10
+  # 摘要字数（中文字符）
+  summary_length: 200
+  # 输出目录
+  dir: "data"
+
+# 内容提取配置
+extraction:
+  # 对于 HTML 类 feed 是否启用 trafilatura 提取正文
+  # 设为 false 则只使用 feed 摘要
+  enabled: true
+  # 超时秒数
+  timeout: 30
