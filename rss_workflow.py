@@ -15,11 +15,12 @@ import sqlite3
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+
 
 import yaml
 import feedparser
 import trafilatura
+import httpx
 from openai import OpenAI
 from jinja2 import Environment, FileSystemLoader
 
@@ -115,50 +116,94 @@ def get_today_articles(conn):
 
 # ─── RSS 抓取 ────────────────────────────────────────────
 
+USER_AGENT = (
+    "Mozilla/5.0 (Linux; Android 14) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.6367.113 Mobile Safari/537.36"
+)
+
+FEED_TIMEOUT = 20  # 单个 feed 超时（秒）
+
+
+def fetch_feed_xml(url: str) -> str | None:
+    """用 httpx 抓取 feed XML，带超时和 User-Agent，返回原始 XML 文本"""
+    try:
+        with httpx.Client(
+            timeout=httpx.Timeout(FEED_TIMEOUT, connect=10),
+            follow_redirects=True,
+            headers={"User-Agent": USER_AGENT},
+        ) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            return resp.text
+    except httpx.TimeoutException:
+        print(f"⏱️ 超时")
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP {e.response.status_code}")
+    except httpx.RequestError as e:
+        print(f"网络错误: {e.__class__.__name__}")
+    except Exception as e:
+        print(f"未知错误: {e}")
+    return None
+
+
+def parse_feed_entries(xml_text: str, feed_name: str, seen_urls: set) -> list[dict]:
+    """解析 XML 文本为文章列表"""
+    articles = []
+    parsed = feedparser.parse(xml_text)
+
+    # feedparser 的 bozo 位为 True 说明 XML 有瑕疵，
+    # 但只要解析出了条目就不算失败
+    if parsed.bozo and not parsed.entries:
+        return articles
+
+    for entry in parsed.entries:
+        article_url = entry.get("link", "").strip()
+        if not article_url or article_url in seen_urls:
+            continue
+        seen_urls.add(article_url)
+
+        articles.append({
+            "feed": feed_name,
+            "url": article_url,
+            "title": entry.get("title", "无标题").strip(),
+            "published": entry.get("published", entry.get("updated", "")),
+            "summary": entry.get("summary", ""),
+        })
+
+    return articles
+
+
 def fetch_feeds(config):
     """抓取所有 RSS feed，返回去重后的文章列表"""
     feeds_config = config["feeds"]
     articles = []
     seen_urls = set()
+    total = len(feeds_config)
 
-    for feed_cfg in feeds_config:
+    for idx, feed_cfg in enumerate(feeds_config, 1):
         name = feed_cfg["name"]
         url = feed_cfg["url"]
-        print(f"  📡 {name} ... ", end="", flush=True)
+        print(f"  [{idx}/{total}] 📡 {name} ... ", end="", flush=True)
 
-        try:
-            parsed = feedparser.parse(url)
-            if parsed.bozo and not parsed.entries:
-                print(f"⚠️ 解析失败")
-                continue
+        xml_text = fetch_feed_xml(url)
+        if xml_text is None:
+            continue
 
-            count = 0
-            for entry in parsed.entries:
-                article_url = entry.get("link", "")
-                if not article_url or article_url in seen_urls:
-                    continue
-                seen_urls.add(article_url)
+        entries = parse_feed_entries(xml_text, name, seen_urls)
+        if not entries:
+            print("⚠️ 无有效条目")
+            continue
 
-                title = entry.get("title", "无标题")
-                published = entry.get("published", entry.get("updated", ""))
-                summary = entry.get("summary", "")
-
-                articles.append({
-                    "feed": name,
-                    "url": article_url,
-                    "title": title,
-                    "published": published,
-                    "summary": summary,
-                })
-                count += 1
-
-            print(f"{count} 篇")
-        except Exception as e:
-            print(f"❌ {e}")
+        articles.extend(entries)
+        print(f"{len(entries)} 篇")
 
     # 按优先级+发布时间排序
     priority_map = {cfg["name"]: cfg.get("priority", 9) for cfg in feeds_config}
-    articles.sort(key=lambda a: (priority_map.get(a["feed"], 9), a.get("published", "")), reverse=False)
+    articles.sort(
+        key=lambda a: (priority_map.get(a["feed"], 9), a.get("published", "")),
+        reverse=False,
+    )
     return articles
 
 
