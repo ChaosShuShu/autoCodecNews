@@ -47,13 +47,13 @@ feeds:
 # 翻译引擎配置
 llm:
   # 可选: openai / deepseek / qwen / ollama
-  provider: "openai"
+  provider: "opencode-go"
   # 模型名:
   #   openai → gpt-4o-mini (推荐), gpt-4o
   #   deepseek → deepseek-chat
   #   qwen → qwen-turbo, qwen-plus
   #   ollama → llama3, qwen2 等本地模型
-  model: "gpt-4o-mini"
+  model: "deepseek-v4-flash"
   # 可选：用 DeepSeek 更便宜
   # provider: "deepseek"
   # model: "deepseek-chat"

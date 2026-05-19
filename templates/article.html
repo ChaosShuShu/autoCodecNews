@@ -3,36 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="title-cn" content="{{ title_cn }}">
-<meta name="summary" content="{{ summary }}">
-<meta name="keywords" content="{{ keywords|join(',') }}">
-<title>{{ title_cn }} - autoCodecDoc</title>
+<meta name="title-cn" content="{{ title_cn|e }}">
+<meta name="summary" content="{{ summary|e }}">
+<meta name="keywords" content="{{ keywords|join(',')|e }}">
+<title>{{ title_cn|e }} - autoCodecDoc</title>
 <style>
-  body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #fafafa; color: #333; line-height: 1.8; }
-  .header { border-bottom: 2px solid #e0e0e0; padding-bottom: 16px; margin-bottom: 24px; }
-  .title-cn { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+  body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; max-width: 860px; margin: 0 auto; padding: 20px; background: #fafafa; color: #333; line-height: 1.8; }
+  .header { border-bottom: 2px solid #0366d6; padding-bottom: 16px; margin-bottom: 24px; }
+  .title-cn { font-size: 22px; font-weight: bold; margin-bottom: 4px; color: #1a1a1a; }
   .title-en { font-size: 14px; color: #888; margin-bottom: 8px; }
   .meta { font-size: 13px; color: #999; }
-  .meta a { color: #0366d6; text-decoration: none; }
-  .meta a:hover { text-decoration: underline; }
-  .summary { background: #fffbe6; border-left: 4px solid #ffd700; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+
+  .summary-box { background: #fffbe6; border-left: 4px solid #ffd700; padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; font-size: 14px; line-height: 1.7; }
+  .summary-box strong { color: #b8860b; }
   .keywords { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
   .keyword { background: #e8f4fd; color: #0366d6; padding: 2px 10px; border-radius: 12px; font-size: 13px; }
-  .content { font-size: 15px; }
-  .content p { margin: 0 0 12px 0; }
+
+  .tabs { display: flex; gap: 0; margin: 20px 0; border-bottom: 2px solid #e0e0e0; }
+  .tab-btn { padding: 10px 24px; border: none; background: none; cursor: pointer; font-size: 15px; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab-btn.active { color: #0366d6; border-bottom-color: #0366d6; font-weight: bold; }
+  .tab-btn:hover { color: #0366d6; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .article-body { font-size: 15px; }
+  .article-body p { margin: 0 0 12px 0; }
+  .article-body pre { white-space: pre-wrap; font-size: 14px; background: #f5f5f5; padding: 16px; border-radius: 6px; line-height: 1.6; overflow-x: auto; }
+
   .actions { margin: 20px 0; padding: 16px; background: #f0f0f0; border-radius: 8px; text-align: center; }
-  .actions a { display: inline-block; margin: 0 8px; padding: 8px 20px; background: #0366d6; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; }
+  .actions a { display: inline-block; margin: 0 8px; padding: 8px 24px; background: #0366d6; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; }
   .actions a:hover { background: #0255b3; }
-  .actions a.secondary { background: #666; }
-  .back { margin-top: 24px; text-align: center; }
+
+  .back { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; text-align: center; }
   .back a { color: #0366d6; text-decoration: none; font-size: 14px; }
 </style>
 </head>
 <body>
+
 <div class="header">
-  <div class="title-cn">{{ title_cn }}</div>
+  <div class="title-cn">{{ title_cn|e }}</div>
   {% if title != title_cn %}
-  <div class="title-en">原文标题: {{ title }}</div>
+  <div class="title-en">{{ title|e }}</div>
   {% endif %}
   <div class="meta">
     📡 {{ feed }} &nbsp;|&nbsp; 📅 {{ published }}
@@ -40,36 +51,59 @@
 </div>
 
 {% if summary %}
-<div class="summary">
-  <strong>📝 内容摘要</strong><br>
-  {{ summary }}
+<div class="summary-box">
+  <strong>📝 中文摘要</strong><br>
+  {{ summary|e }}
 </div>
 {% endif %}
 
 {% if keywords %}
 <div class="keywords">
   {% for kw in keywords %}
-  <span class="keyword">#{{ kw }}</span>
+  <span class="keyword">#{{ kw|e }}</span>
   {% endfor %}
 </div>
 {% endif %}
 
 <div class="actions">
-  <a href="{{ url }}" target="_blank">📎 阅读原文</a>
-  {% if content %}
-  <a class="secondary" href="#local">📖 本地译文</a>
-  {% endif %}
+  <a href="{{ url }}" target="_blank">📎 阅读原文（外链）</a>
 </div>
 
-{% if content %}
-<div class="content" id="local">
-  <h3>📖 本地存档原文</h3>
-  <pre style="white-space: pre-wrap; font-size: 14px; background: #f5f5f5; padding: 16px; border-radius: 6px;">{{ content[:8000] }}{% if content|length > 8000 %}\n\n...[原文过长，此处截断]...{% endif %}</pre>
+{% if translation %}
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('translation')">📖 中文译文</button>
+  <button class="tab-btn" onclick="switchTab('original')">📄 英文原文</button>
+</div>
+
+<div id="tab-translation" class="tab-content active">
+  <div class="article-body">
+    <pre>{{ translation|e }}</pre>
+  </div>
 </div>
 {% endif %}
 
-<div class="back">
-  <a href="../daily/{{ id[:10] }}.html">← 返回今日日报</a>
+<div id="tab-original" class="tab-content {% if not translation %}active{% endif %}">
+  <div class="article-body">
+    {% if content %}
+    <pre>{{ content|e }}</pre>
+    {% else %}
+    <p style="color: #999;">（无本地存档）</p>
+    {% endif %}
+  </div>
 </div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelector(`.tab-btn[onclick*="'${name}'"]`).classList.add('active');
+}
+</script>
+
+<div class="back">
+  <a href="../daily/">← 返回日报首页</a>
+</div>
+
 </body>
 </html>

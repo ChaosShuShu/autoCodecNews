@@ -10,6 +10,7 @@ RSS 订阅 → 翻译 → 日报 工作流
 import os
 import re
 import json
+import html
 import hashlib
 import sqlite3
 import argparse
@@ -241,25 +242,29 @@ SYSTEM_PROMPT = """你是一个专业的音视频技术文章翻译助手。
 1. 将文章标题翻译成中文
 2. 用 200 字左右的中文总结文章核心内容
 3. 提取 3-5 个中文关键词
+4. 将全文翻译成中文（保留技术术语的英文原名，如 "SVC（可伸缩视频编码）"）
 
 请严格按照以下 JSON 格式返回（不要包含 ```json 标记）：
 {
     "title_cn": "中文标题",
     "summary": "200字左右的中文核心内容总结",
-    "keywords": ["关键词1", "关键词2", "关键词3"]
+    "keywords": ["关键词1", "关键词2", "关键词3"],
+    "translation": "全文中文翻译..."
 }
 
 注意：
-- 如果是中文文章则不需要翻译标题，直接用原标题
+- 如果是中文文章则不需要翻译，translation 返回原文
 - 如果文章内容太少无法总结，summary 置为空字符串
 - 技术术语保留英文并附中文翻译，如 "SVC（可伸缩视频编码）"
+- translation 要完整翻译文章内容，不要省略
 """
 
 
 def translate_and_summarize(client, model, title, content):
     """调用 LLM 同时完成翻译 + 摘要"""
     # 限制输入长度（token 估算：约 4 字符/token）
-    max_chars = 12000
+    # 模型上下文窗口较大，适当放宽限制
+    max_chars = 25000
     if len(content) > max_chars:
         content = content[:max_chars] + "\n\n[文章过长，已截断]"
 
@@ -278,7 +283,7 @@ def translate_and_summarize(client, model, title, content):
             ],
             temperature=0.3,
             response_format={"type": "json_object"},
-            timeout=60,
+            timeout=120,
         )
         result = json.loads(resp.choices[0].message.content)
         return result
@@ -288,6 +293,7 @@ def translate_and_summarize(client, model, title, content):
             "title_cn": title,
             "summary": "",
             "keywords": [],
+            "translation": "",
         }
 
 
@@ -305,6 +311,7 @@ def save_article(article_id, article, cn_data, content):
         title_cn=cn_data.get("title_cn", article["title"]),
         summary=cn_data.get("summary", ""),
         keywords=cn_data.get("keywords", []),
+        translation=cn_data.get("translation", ""),
         feed=article["feed"],
         url=article["url"],
         published=article["published"],
@@ -340,16 +347,16 @@ def generate_daily_digest(today_articles):
         if article_html.exists():
             with open(article_html) as f:
                 html_content = f.read()
-                # 从 HTML meta 中提取
+                # 从 HTML meta 中提取（注意反转义 HTML 实体）
                 m = re.search(r'<meta name="title-cn" content="([^"]+)"', html_content)
                 if m:
-                    title_cn = m.group(1)
+                    title_cn = html.unescape(m.group(1))
                 m = re.search(r'<meta name="summary" content="([^"]+)"', html_content)
                 if m:
-                    summary = m.group(1)
+                    summary = html.unescape(m.group(1))
                 m = re.search(r'<meta name="keywords" content="([^"]+)"', html_content)
                 if m:
-                    keywords = m.group(1).split(",")
+                    keywords = [html.unescape(k) for k in m.group(1).split(",")]
 
         articles_data.append({
             "id": article_id,
