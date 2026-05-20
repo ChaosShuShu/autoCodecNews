@@ -4,9 +4,9 @@
 
 # RSS 订阅源列表
 feeds:
-  - name: "FFmpeg Blog"
-    url: "https://ffmpeg.org/blog.rss"
-    priority: 1
+#  - name: "FFmpeg Blog"
+#    url: "https://ffmpeg.org/main.rss"
+#    priority: 1
 
   - name: "Netflix Tech Blog"
     url: "https://netflixtechblog.com/feed"
@@ -58,10 +58,263 @@ llm:
   # provider: "deepseek"
   # model: "deepseek-chat"
 
+# 内容过滤
+filter:
+  # 最多处理几天内的文章（0=不限）
+  max_days: 5
+  # 主题关键词白名单（标题+摘要包含任一即视为相关，覆盖中英文）
+  # 留空则不启用主题过滤
+  keywords:
+    # ── 编码标准 ──
+    - H.264
+    - H.265
+    - HEVC
+    - AV1
+    - VP9
+    - VVC
+    - MPEG
+    - AVC
+    - EVC
+    - LCEVC
+    - AVS3
+    - AVS2
+    - xHE-AAC
+    - USAC
+
+    # ── 编码器实现 ──
+    - x264
+    - x265
+    - libvpx
+    - dav1d
+    - rav1e
+    - SVT-AV1
+    - aomenc
+    - NVENC
+    - VAAPI
+    - Vulkan
+    - CUDA
+    - QuickSync
+    - AMF
+    - MediaCodec
+
+    # ── 编解码技术 ──
+    - codec
+    - encoding
+    - decoding
+    - transcoding
+    - transcode
+    - bitrate
+    - variable bitrate
+    - constant bitrate
+    - CBR
+    - VBR
+    - CRF
+    - rate control
+    - quantization
+    - QP
+    - motion estimation
+    - intra frame
+    - inter frame
+    - keyframe
+    - GOP
+    - B-frame
+    - P-frame
+    - I-frame
+    - entropy coding
+    - CABAC
+    - CAVLC
+    - transform coding
+    - DCT
+    - loop filter
+    - deblocking
+    - SAO
+
+    # ── 视频处理 ──
+    - resolution
+    - upscaling
+    - denoising
+    - deinterlacing
+    - HDR
+    - SDR
+    - Dolby Vision
+    - tone mapping
+    - color space
+    - chroma subsampling
+    - YUV
+    - RGB
+    - BT.709
+    - BT.2020
+    - gamma
+    - bit depth
+    - 10-bit
+    - HDR10
+
+    # ── 音频 ──
+    - Opus
+    - FLAC
+    - Dolby
+    - DTS
+    - spatial audio
+    - perceptual audio
+    - psychoacoustic
+    - surround sound
+    - channel mapping
+    - audio codec
+    - speech codec
+    - SILK
+    - EVS
+    - LDAC
+
+    # ── 流媒体 ──
+    - streaming
+    - adaptive bitrate
+    - ABR
+    - DASH
+    - HLS
+    - RTMP
+    - SRT
+    - CMAF
+    - fMP4
+    - muxing
+    - demuxing
+    - container
+    - segment
+    - manifest
+    - playlist
+    - multicast
+    - CDN
+    - origin
+    - edge server
+    - streaming protocol
+    - live streaming
+    - video on demand
+    - VoD
+    - just-in-time packaging
+
+    # ── 传输与协议 ──
+    - RTP
+    - RTSP
+    - low latency
+    - ultra low latency
+    - latency
+    - packet loss
+    - jitter
+    - buffer
+    - bitstream
+    - transport stream
+    - TS
+    - FLV
+    - WebM
+    - MKV
+
+    # ── 视频会议 ──
+    - SVC
+    - simulcast
+    - scalable video
+    - video conferencing
+    - echo cancellation
+    - AEC
+    - noise suppression
+    - NS
+    - AGC
+    - automatic gain control
+    - real-time communication
+    - RTC
+
+    # ── 质量与指标 ──
+    - PSNR
+    - SSIM
+    - VMAF
+    - BD-Rate
+    - objective quality
+    - perceptual quality
+    - MOS
+    - quality metrics
+    - encoding efficiency
+    - compression ratio
+
+    # ── 工具与框架 ──
+    - FFmpeg
+    - GStreamer
+    - OBS
+    - VLC
+    - MediaPipe
+    - OpenCV
+    - GPAC
+    - HandBrake
+    - x264
+    - x265
+    - Shaka Packager
+    - Bento4
+
+    # ── 平台/组织 ──
+    - Alliance for Open Media
+    - MPEG LA
+    - AOM
+    - Netflix
+    - YouTube
+    - Twitch
+    - Bitmovin
+    - Vimeo
+    - Apple
+    - Google
+    - Microsoft
+
+    # ── 硬件 ──
+    - hardware acceleration
+    - HW encode
+    - HW decode
+    - GPU
+    - DSP
+    - NPU
+    - SoC
+    - FPGA
+    - Apple Silicon
+    - Media Engine
+    - Rockchip
+    - ARM
+    - Intel
+    - NVIDIA
+    - AMD
+    - Qualcomm
+    - Mali
+
+    # ── 中文术语 ──
+    - 编解码
+    - 编解码器
+    - 编码
+    - 解码
+    - 转码
+    - 编码器
+    - 解码器
+    - 视频
+    - 音频
+    - 音视频
+    - 流媒体
+    - 压缩
+    - 码率
+    - 分辨率
+    - 帧率
+    - 实时通信
+    - 视频会议
+    - 直播
+    - 点播
+    - 传输协议
+    - 封装格式
+    - 硬解
+    - 硬编
+    - 软解
+    - 硬件加速
+    - 视频处理
+    - 音频处理
+    - 降噪
+    - 回声消除
+    - 网络自适应
+
 # 输出配置
 output:
   # 每日最大文章数
-  max_articles_per_day: 10
+  max_articles_per_day: 20
   # 摘要字数（中文字符）
   summary_length: 200
   # 输出目录

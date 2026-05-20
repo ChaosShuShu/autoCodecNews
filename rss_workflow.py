@@ -14,7 +14,7 @@ import html
 import hashlib
 import sqlite3
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 
@@ -54,6 +54,18 @@ def load_env():
                 os.environ.setdefault(key.strip(), val.strip())
 
 
+def normalize_base_url(raw: str) -> str:
+    """修正 BASE_URL：去掉多余的 /chat/completions 后缀，确保以 /v1 结尾"""
+    url = raw.strip().rstrip("/")
+    # 去掉多余的 /chat/completions（用户可能在 .env 里填了完整地址）
+    if url.endswith("/chat/completions"):
+        url = url[: -len("/chat/completions")]
+    # 确保以 /v1 结尾
+    if not url.endswith("/v1"):
+        url += "/v1"
+    return url
+
+
 def get_llm_client(config):
     """获取 LLM 客户端，支持 OpenAI 兼容接口和 Ollama"""
     provider = config["llm"]["provider"]
@@ -64,9 +76,10 @@ def get_llm_client(config):
             base_url=f"{ollama_url}/v1",
         )
     else:
+        raw_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
         return OpenAI(
             api_key=os.getenv("OPENAI_API_KEY", ""),
-            base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+            base_url=normalize_base_url(raw_url),
         )
 
 
@@ -95,13 +108,13 @@ def is_article_seen(conn, url):
     return cur.fetchone() is not None
 
 
-def mark_article(conn, url, feed, title, published):
+def mark_article(conn, url, feed, title, published, status="processed"):
     article_id = hashlib.md5(url.encode()).hexdigest()[:12]
     now = datetime.now(timezone.utc).isoformat()
     conn.execute("""
         INSERT OR REPLACE INTO articles (id, url, feed, title, published, fetched_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'processed')
-    """, (article_id, url, feed, title, published, now))
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (article_id, url, feed, title, published, now, status))
     conn.commit()
     return article_id
 
@@ -113,6 +126,77 @@ def get_today_articles(conn):
         (today,),
     )
     return cur.fetchall()
+
+
+# ─── 文章过滤 ────────────────────────────────────────────
+
+def parse_rss_date(published: str, entry) -> datetime | None:
+    """从 RSS 条目中解析发布日期"""
+    # feedparser 提供 parsed 结构
+    if hasattr(entry, "published_parsed") and entry.published_parsed:
+        from time import mktime
+        return datetime.fromtimestamp(mktime(entry.published_parsed))
+    # 无解析结果时尝试手动
+    if published:
+        for fmt in [
+            "%a, %d %b %Y %H:%M:%S %z",
+            "%a, %d %b %Y %H:%M:%S %Z",
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%d %H:%M:%S",
+        ]:
+            try:
+                return datetime.strptime(published.strip(), fmt)
+            except ValueError:
+                continue
+    return None
+
+
+def filter_by_date(articles: list[dict], max_days: int) -> list[dict]:
+    """过滤出 max_days 天内的文章，max_days=0 不限制"""
+    if max_days <= 0:
+        return articles
+    cutoff = datetime.now(timezone.utc).astimezone() - timedelta(days=max_days)
+    kept, skipped = 0, 0
+    result = []
+    for art in articles:
+        pub = parse_rss_date(art.get("published", ""), art.get("_entry"))
+        if pub is None:
+            # 无法解析日期，默认保留
+            result.append(art)
+            kept += 1
+        elif pub.astimezone() >= cutoff:
+            result.append(art)
+            kept += 1
+        else:
+            skipped += 1
+    if skipped:
+        print(f"   ⏳ 跳过 {skipped} 篇超期文章（{max_days} 天前）")
+    return result
+
+
+def is_relevant_article(article: dict, config: dict) -> bool:
+    """检查文章是否与音视频/编解码相关（关键词匹配标题+摘要）"""
+    keywords = config.get("filter", {}).get("keywords", [])
+    if not keywords:
+        return True  # 未配置关键词，全部保留
+
+    text = f"{article['title']} {article.get('summary', '')}".lower()
+    for kw in keywords:
+        if kw.lower() in text:
+            return True
+    return False
+
+
+def filter_by_relevance(articles: list[dict], config: dict) -> tuple[list[dict], list[dict]]:
+    """按主题过滤，返回 (相关文章列表, 不相关文章列表)"""
+    relevant, irrelevant = [], []
+    for art in articles:
+        if is_relevant_article(art, config):
+            relevant.append(art)
+        else:
+            irrelevant.append(art)
+    return relevant, irrelevant
 
 
 # ─── RSS 抓取 ────────────────────────────────────────────
@@ -170,6 +254,7 @@ def parse_feed_entries(xml_text: str, feed_name: str, seen_urls: set) -> list[di
             "title": entry.get("title", "无标题").strip(),
             "published": entry.get("published", entry.get("updated", "")),
             "summary": entry.get("summary", ""),
+            "_entry": entry,  # 保留原始 entry 用于日期解析
         })
 
     return articles
@@ -264,7 +349,7 @@ def translate_and_summarize(client, model, title, content):
     """调用 LLM 同时完成翻译 + 摘要"""
     # 限制输入长度（token 估算：约 4 字符/token）
     # 模型上下文窗口较大，适当放宽限制
-    max_chars = 25000
+    max_chars = 12000
     if len(content) > max_chars:
         content = content[:max_chars] + "\n\n[文章过长，已截断]"
 
@@ -285,7 +370,19 @@ def translate_and_summarize(client, model, title, content):
             response_format={"type": "json_object"},
             timeout=120,
         )
-        result = json.loads(resp.choices[0].message.content)
+        # 尝试解析 JSON，如果失败做一次清理再重试
+        raw = resp.choices[0].message.content.strip()
+        # 去掉可能的 ```json 包裹
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            # 某些模型会返回含无效转义的字符串，尝试修复
+            raw = raw.replace("\n", "\\n").replace("\r", "\\r")
+            raw = raw.replace("\\'", "'")
+            result = json.loads(raw)
         return result
     except Exception as e:
         print(f"      ⚠️ LLM 调用失败: {e}")
@@ -305,7 +402,7 @@ def save_article(article_id, article, cn_data, content):
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
     template = env.get_template("article.html")
 
-    html = template.render(
+    rendered = template.render(
         id=article_id,
         title=article["title"],
         title_cn=cn_data.get("title_cn", article["title"]),
@@ -320,7 +417,7 @@ def save_article(article_id, article, cn_data, content):
 
     filepath = ARTICLES_DIR / f"{article_id}.html"
     with open(filepath, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(rendered)
     return filepath
 
 
@@ -370,7 +467,7 @@ def generate_daily_digest(today_articles):
             "cn_path": cn_html_path,
         })
 
-    html = template.render(
+    rendered = template.render(
         date=today,
         article_count=len(articles_data),
         articles=articles_data,
@@ -378,7 +475,7 @@ def generate_daily_digest(today_articles):
 
     filepath = DAILY_DIR / f"{today}.html"
     with open(filepath, "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(rendered)
 
     print(f"\n  📝 日报已生成: {filepath}")
     return filepath
@@ -405,13 +502,38 @@ def main():
     articles = fetch_feeds(config)
     print(f"\n   共获取 {len(articles)} 篇去重文章")
 
-    # 2. 过滤新文章
+    # 2a. 按日期过滤（--days 优先于 config）
+    config_max_days = config.get("filter", {}).get("max_days", 0)
+    max_days = args.days if args.days > 0 else config_max_days
+    if max_days > 0:
+        source = "命令行 --days" if args.days > 0 else "配置文件"
+        print(f"   📅 仅处理 {max_days} 天内的文章（来源: {source}）")
+    articles = filter_by_date(articles, max_days)
+
+    # 2b. 按主题过滤 → 分离相关/不相关
+    relevant, irrelevant = filter_by_relevance(articles, config)
+
+    # 输出丢弃的文章标题
+    if irrelevant:
+        print(f"\n   🎯 以下 {len(irrelevant)} 篇文章因不相关已丢弃:")
+        for art in irrelevant:
+            title_short = art["title"][:80].replace("\n", " ")
+            print(f"      ❌ [{art['feed']}] {title_short}")
+
+    # 不相关文章仍需入库（防后续重复抓取）
+    for art in irrelevant:
+        mark_article(conn, art["url"], art["feed"], art["title"], art["published"], status="irrelevant")
+
+    # 后续只处理相关文章
+    articles = relevant
+
+    # 3. 过滤新文章
     new_articles = []
     for art in articles:
         if args.force or not is_article_seen(conn, art["url"]):
             new_articles.append(art)
 
-    print(f"   其中 {len(new_articles)} 篇新文章需要处理")
+    print(f"\n   其中 {len(new_articles)} 篇新文章需要处理")
     print()
 
     if not new_articles:
@@ -423,7 +545,7 @@ def main():
             print(f"\n💡 基于今日已处理的 {len(today_ids)} 篇文章生成了日报")
         return
 
-    # 3. 处理新文章（限制数量）
+    # 4. 处理新文章（限制数量）
     max_articles = config["output"].get("max_articles_per_day", 10)
     to_process = new_articles[:max_articles]
 
