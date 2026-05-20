@@ -150,22 +150,7 @@ filter:
     - bit depth
     - 10-bit
     - HDR10
-
-    # ── 音频 ──
-    - Opus
-    - FLAC
-    - Dolby
-    - DTS
-    - spatial audio
-    - perceptual audio
-    - psychoacoustic
-    - surround sound
-    - channel mapping
-    - audio codec
-    - speech codec
-    - SILK
-    - EVS
-    - LDAC
+    - HDR
 
     # ── 流媒体 ──
     - streaming
@@ -266,19 +251,11 @@ filter:
     - hardware acceleration
     - HW encode
     - HW decode
-    - GPU
     - DSP
-    - NPU
     - SoC
     - FPGA
-    - Apple Silicon
     - Media Engine
     - Rockchip
-    - ARM
-    - Intel
-    - NVIDIA
-    - AMD
-    - Qualcomm
     - Mali
 
     # ── 中文术语 ──
@@ -308,10 +285,6 @@ filter:
     - 软解
     - 硬件加速
     - 视频处理
-    - 音频处理
-    - 降噪
-    - 回声消除
-    - 网络自适应
 
 # 输出配置
 output:

@@ -122,7 +122,7 @@ def mark_article(conn, url, feed, title, published, status="processed"):
 def get_today_articles(conn):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     cur = conn.execute(
-        "SELECT id, url, feed, title, published FROM articles WHERE date(fetched_at) = ? ORDER BY published DESC",
+        "SELECT id, url, feed, title, published FROM articles WHERE date(fetched_at) = ? AND status != 'irrelevant' ORDER BY published DESC",
         (today,),
     )
     return cur.fetchall()
