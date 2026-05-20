@@ -175,26 +175,40 @@ def filter_by_date(articles: list[dict], max_days: int) -> list[dict]:
     return result
 
 
-def is_relevant_article(article: dict, config: dict) -> bool:
-    """检查文章是否与音视频/编解码相关（关键词匹配标题+摘要）"""
+def is_relevant_article(article: dict, config: dict) -> tuple[bool, list[str]]:
+    """检查文章是否与音视频/编解码相关，返回 (是否相关, 命中的关键词列表)"""
     keywords = config.get("filter", {}).get("keywords", [])
     if not keywords:
-        return True  # 未配置关键词，全部保留
+        return True, []  # 未配置关键词，全部保留
 
+    min_match = config.get("filter", {}).get("min_match", 2)
     text = f"{article['title']} {article.get('summary', '')}".lower()
+    matched = []
+
     for kw in keywords:
-        if kw.lower() in text:
-            return True
-    return False
+        # 使用 word-boundary 匹配，防止短词/缩写作为子串误匹配
+        # 如 "NS" 不会匹配 "transaction"，"Intel" 不会匹配 "intelligence"
+        pattern = r'\b' + re.escape(kw.lower()) + r'\b'
+        if re.search(pattern, text):
+            matched.append(kw)
+            if len(matched) >= min_match:
+                break  # 达到阈值即可提前退出
+
+    is_relevant = len(matched) >= min_match
+    return is_relevant, matched
 
 
 def filter_by_relevance(articles: list[dict], config: dict) -> tuple[list[dict], list[dict]]:
     """按主题过滤，返回 (相关文章列表, 不相关文章列表)"""
+    min_match = config.get("filter", {}).get("min_match", 2)
     relevant, irrelevant = [], []
     for art in articles:
-        if is_relevant_article(art, config):
+        is_rel, matched = is_relevant_article(art, config)
+        if is_rel:
+            art["_kw_matched"] = matched  # 记录命中关键词，供日志输出
             relevant.append(art)
         else:
+            art["_kw_matched"] = matched
             irrelevant.append(art)
     return relevant, irrelevant
 
@@ -513,12 +527,21 @@ def main():
     # 2b. 按主题过滤 → 分离相关/不相关
     relevant, irrelevant = filter_by_relevance(articles, config)
 
+    # 输出匹配统计
+    min_match = config.get("filter", {}).get("min_match", 2)
+    if articles:
+        kw_total = sum(len(a.get("_kw_matched", [])) for a in relevant)
+        kw_avg = kw_total / len(relevant) if relevant else 0
+        print(f"   🔑 min_match={min_match} | 相关{len(relevant)}篇(均命中{kw_avg:.1f}个关键词) | 不相关{len(irrelevant)}篇")
+
     # 输出丢弃的文章标题
     if irrelevant:
-        print(f"\n   🎯 以下 {len(irrelevant)} 篇文章因不相关已丢弃:")
+        print(f"\n   🎯 以下文章因命中关键词不足 {min_match} 个已丢弃:")
         for art in irrelevant:
             title_short = art["title"][:80].replace("\n", " ")
-            print(f"      ❌ [{art['feed']}] {title_short}")
+            kw_str = ", ".join(art.get("_kw_matched", [])[:5])
+            kw_info = f" (仅命中: {kw_str})" if kw_str else ""
+            print(f"      ❌ [{art['feed']}] {title_short}{kw_info}")
 
     # 不相关文章仍需入库（防后续重复抓取）
     for art in irrelevant:
