@@ -8,41 +8,42 @@ feeds:
 #    url: "https://ffmpeg.org/main.rss"
 #    priority: 1
 
-  - name: "Netflix Tech Blog"
-    url: "https://netflixtechblog.com/feed"
+  - name: "StreaminMedia News"
+    url: "http://feeds.infotoday.com/StreamingMediaMagazine-FeaturedNews"
     priority: 1
 
-  - name: "AOM (AV1)"
-    url: "https://aomedia.org/feed/"
+  - name: "StreaminMedia Articles"
+    url: "http://feeds.infotoday.com/StreamingMediaMagazine-FeaturedArticles"
+    priority: 1
+
+  - name: "StreaminMedia Blogs"
+    url: "http://feeds.infotoday.com/Streaming-Media-Blog"
+    priority: 1
+
+  - name: "StreaminMedia Industry Announcements"
+    url: "http://feeds.infotoday.com/StreamingMediaMagazine-IndustryNews"
     priority: 1
 
   - name: "Streaming Learning Center"
     url: "https://streaminglearningcenter.com/feed"
     priority: 2
 
-  - name: "Bitmovin Blog"
-    url: "https://bitmovin.com/blog/feed/"
-    priority: 2
-
-  - name: "Twitch Engineering"
-    url: "https://blog.twitch.tv/en/engineering/feed"
-    priority: 2
-
-  - name: "Meta Engineering"
-    url: "https://engineering.fb.com/feed/"
-    priority: 2
-
-  - name: "Google AI Blog"
-    url: "https://ai.googleblog.com/feeds/posts/default"
-    priority: 2
-
-  - name: "Demuxed"
-    url: "https://demuxed.com/feed"
-    priority: 3
-
   - name: "Red5 Pro"
     url: "https://www.red5pro.com/blog/feed/"
     priority: 3
+
+# ----------学术论文信息----------
+  - name: "cs.Multimedia(Multimedia) 多媒体系统、音视频处理、流媒体"
+    url: "https://rss.arxiv.org/rss/cs.MM"
+    priority: 1
+
+  - name: "eecs.IV(Image and Video Processing) 视频编解码核心 "
+    url: "https://rss.arxiv.org/rss/cs.MM"
+    priority: 1
+
+  - name: "cs.Network 流媒体传输、ABR、自适应流"
+    url: "https://rss.arxiv.org/rss/cs.NI"
+    priority: 1
 
 # 翻译引擎配置
 llm:
@@ -63,7 +64,7 @@ filter:
   # 最多处理几天内的文章（0=不限）
   max_days: 5
   # 最少命中几个关键词才算相关（默认2，防止单个通用词误匹配）
-  min_match: 2
+  min_match: 1
   # 主题关键词白名单（标题+摘要含至少 min_match 个即视为相关）
   # 留空则不启用主题过滤
   keywords:

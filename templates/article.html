@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="title-cn" content="{{ title_cn|e }}">
 <meta name="summary" content="{{ summary|e }}">
-<meta name="keywords" content="{{ keywords|join(',')|e }}">
+<meta name="keywords" content="{{ kw_meta|e }}">
 <title>{{ title_cn|e }} - autoCodecDoc</title>
 <style>
   body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; max-width: 860px; margin: 0 auto; padding: 20px; background: #fafafa; color: #333; line-height: 1.8; }
@@ -57,8 +57,11 @@
 </div>
 {% endif %}
 
-{% if keywords %}
+{% if kw_pairs or keywords %}
 <div class="keywords">
+  {% for pair in kw_pairs %}
+  <span class="keyword" title="{{ pair.en|e }}">{{ pair.cn|e }} {% if pair.en != pair.cn %}<span style="color:#999;font-size:11px">{{ pair.en|e }}</span>{% endif %}</span>
+  {% endfor %}
   {% for kw in keywords %}
   <span class="keyword">#{{ kw|e }}</span>
   {% endfor %}

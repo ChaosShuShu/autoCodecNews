@@ -408,20 +408,85 @@ def translate_and_summarize(client, model, title, content):
         }
 
 
+# ─── 批量翻译关键词 ──────────────────────────────────────
+
+KEYWORD_TRANSLATION_PROMPT = """你是一个技术术语翻译助手。我会给你一些英文技术术语，
+请将它们翻译成中文。注意：
+- 专有名词/缩写保留英文，如 "H.264"、"FFmpeg"
+- 标准术语给出常用中文译名，如 "codec" → "编解码器"
+- 返回 JSON 数组，每项包含 en 和 cn 两个字段
+
+示例：
+[
+  {"en": "H.264", "cn": "H.264"},
+  {"en": "FFmpeg", "cn": "FFmpeg"},
+  {"en": "codec", "cn": "编解码器"},
+  {"en": "hardware acceleration", "cn": "硬件加速"}
+]
+"""
+
+
+def batch_translate_keywords(client, model, keywords: list[str]) -> dict[str, str]:
+    """批量翻译关键词列表为中文，返回 {英文: 中文} 字典"""
+    # 去重、排序，避免重复翻译
+    unique = sorted(set(kw.strip() for kw in keywords if kw.strip()))
+    if not unique:
+        return {}
+
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": KEYWORD_TRANSLATION_PROMPT},
+                {"role": "user", "content": json.dumps(unique, ensure_ascii=False)},
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+            timeout=60,
+        )
+        raw = resp.choices[0].message.content.strip()
+        data = json.loads(raw)
+        # 支持两种返回格式: 数组 [{en,cn}] 或对象 {en: cn}
+        if isinstance(data, list):
+            return {item["en"]: item["cn"] for item in data if "en" in item and "cn" in item}
+        elif isinstance(data, dict):
+            return data
+    except Exception as e:
+        print(f"      ⚠️ 关键词批量翻译失败: {e}")
+
+    # 失败时返回原词
+    return {kw: kw for kw in unique}
+
+
 # ─── 文章保存 ────────────────────────────────────────────
 
-def save_article(article_id, article, cn_data, content):
+def save_article(article_id, article, cn_data, content, filter_kw_en=None, filter_kw_cn_map=None):
     """保存单篇文章为 HTML"""
     ARTICLES_DIR.mkdir(parents=True, exist_ok=True)
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
     template = env.get_template("article.html")
+
+    # 合并关键词展示：中英对照的过滤关键词 + 文章 LLM 生成的中文关键词
+    filter_kw_en = filter_kw_en or []
+    filter_kw_cn_map = filter_kw_cn_map or {}
+    matched_kw_pairs = [
+        {"en": kw, "cn": filter_kw_cn_map.get(kw, kw)}
+        for kw in filter_kw_en
+    ]
+    article_kw = cn_data.get("keywords", [])
+    all_keywords_cn = list(dict.fromkeys(article_kw + [p["cn"] for p in matched_kw_pairs]))
+
+    # meta 用逗号分隔存中文关键词
+    kw_meta = ",".join(all_keywords_cn)
 
     rendered = template.render(
         id=article_id,
         title=article["title"],
         title_cn=cn_data.get("title_cn", article["title"]),
         summary=cn_data.get("summary", ""),
-        keywords=cn_data.get("keywords", []),
+        keywords=all_keywords_cn,
+        kw_pairs=matched_kw_pairs,
+        kw_meta=kw_meta,
         translation=cn_data.get("translation", ""),
         feed=article["feed"],
         url=article["url"],
@@ -580,6 +645,17 @@ def main():
     model = config["llm"]["model"]
     timeout_s = config["extraction"].get("timeout", 30)
 
+    # 4a. 批量翻译关键词（仅一次 LLM 调用，覆盖所有配置关键词）
+    all_keywords = config.get("filter", {}).get("keywords", [])
+    kw_translations = {}
+    if all_keywords and to_process:
+        print("   🔤 批量翻译关键词...", end=" ", flush=True)
+        kw_translations = batch_translate_keywords(client, model, all_keywords)
+        print(f"{len(kw_translations)} 个")
+        # 用回退：未翻译的保留原文
+        for kw in all_keywords:
+            kw_translations.setdefault(kw, kw)
+
     processed = 0
     for i, art in enumerate(to_process, 1):
         print(f"\n[{i}/{len(to_process)}] {art['feed']}")
@@ -612,7 +688,11 @@ def main():
 
         # 4c. 入库 + 保存
         article_id = mark_article(conn, art["url"], art["feed"], art["title"], art["published"])
-        save_article(article_id, art, cn_data, content)
+        save_article(
+            article_id, art, cn_data, content,
+            filter_kw_en=art.get("_kw_matched", []),
+            filter_kw_cn_map=kw_translations,
+        )
         processed += 1
 
     print(f"\n{'='*50}")
