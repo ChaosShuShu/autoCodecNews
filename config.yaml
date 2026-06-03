@@ -32,6 +32,10 @@ feeds:
     url: "https://www.red5pro.com/blog/feed/"
     priority: 3
 
+  - name: "Embedded System News"
+    url: "https://www.cnx-software.com/feed/"
+    priority: 1
+
 # ----------学术论文信息----------
   - name: "cs.Multimedia(Multimedia) 多媒体系统、音视频处理、流媒体"
     url: "https://rss.arxiv.org/rss/cs.MM"
@@ -70,9 +74,11 @@ filter:
   keywords:
     # ── 编码标准 ──
     - H.264
+    - H.266
     - H.265
     - HEVC
     - AV1
+    - AV2
     - VP9
     - VVC
     - MPEG
